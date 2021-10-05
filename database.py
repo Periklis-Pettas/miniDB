@@ -387,6 +387,58 @@ class Database:
             else:
                 res.show()
 
+    def left_outer_join(self, left_table_name, right_table_name, condition, save_as=None, return_object=False):
+        '''
+        The result of a left outer join (or simply left join) for table A and B
+        always contains all records of the "left" table (A), even if the
+        join-condition does not find any matching record in the "right" table (B).
+        This means that if the ON clause matches 0 (zero) records in B, the join
+        will still return a row in the result-but with NULL in each column from B.
+        This means that a left outer join returns all the values from the left
+        table, plus matched values from the right table (or NULL in case of no
+        matching join predicate). If the right table returns one row and the left
+        table returns more than one matching row for it, the values in the right
+        table will be repeated for each distinct row on the left table
+        '''
+        self.load(self.savedir)
+        if self.is_locked(left_table_name) or self.is_locked(right_table_name):
+            print(f'Table/Tables are currently locked')
+            return
+
+        res = self.tables[left_table_name]._left_outer_join(self.tables[right_table_name], condition)
+        if save_as is not None:
+            res._name = save_as
+            self.table_from_object(res)
+        else:
+            if return_object:
+                return res
+            else:
+                res.show()
+
+    def right_outer_join(self, left_table_name, right_table_name, condition, save_as=None, return_object=False):
+        """
+        A right outer join (or right join) closely resembles a left outer join,
+        except with the treatment of the tables reversed.
+        Every row from the "right" table (B) will appear in the joined table
+        at least once. If no matching row from the "left" table (A) exists, NULL
+        will appear in columns from A for those records that have no match in B.
+        """
+        self.load(self.savedir)
+        if self.is_locked(left_table_name) or self.is_locked(right_table_name):
+            print(f'Table/Tables are currently locked')
+            return
+
+        res = self.tables[right_table_name]._left_outer_join(self.tables[left_table_name], condition)
+        if save_as is not None:
+            res._name = save_as
+            self.table_from_object(res)
+        else:
+            if return_object:
+                return res
+            else:
+                res.show()
+
+
     def lockX_table(self, table_name):
         '''
         Locks the specified table using the exclusive lock (X)
