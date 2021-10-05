@@ -405,6 +405,139 @@ class Table:
 
         return join_table
 
+
+    def _index_nested_join(self, table_right: Table, condition):
+        '''
+        Join table (left) with a supplied table (right) where condition is met.
+        '''
+        # get columns and operator
+        column_name_left, operator, column_name_right = self._parse_condition(condition, join=True)
+        # try to find both columns, if you fail raise error
+        try:
+            column_index_nested_left = self.column_names.index(column_name_left)
+            column_index_nested_right = table_right.column_names.index(column_name_right)
+        except:
+            raise Exception(f'Columns dont exist in one or both tables.')
+
+        # get the column names of both tables with the table name in front
+        # ex. for left -> name becomes left_table_name_name etc
+        left_names = [f'{self._name}_{colname}' for colname in self.column_names]
+        right_names = [f'{table_right._name}_{colname}' for colname in table_right.column_names]
+
+        # define the new tables name, its column names and types
+        index_nested_join_table_name = f'{self._name}_join_{table_right._name}'
+        index_nested_join_table_colnames = left_names+right_names
+        index_nested_join_table_coltypes = self.column_types+table_right.column_types
+        index_nested_join_table = Table(name=index_nested_join_table_name, column_names=index_nested_join_table_colnames, column_types= index_nested_join_table_coltypes)
+
+        # count the number of operations (<,> etc)
+        no_of_ops = 0
+        # this code is dumb on purpose... it needs to illustrate the underline technique
+        # for each value in left column and right column, if condition, append the corresponding row to the new table
+        for row_left in self.data:
+            left_value = row_left[column_index_nested_left]
+            for row_right in table_right.data:
+                right_value = row_right[column_index_nested_right]
+                no_of_ops+=1
+                if get_op(operator, left_value, right_value): #EQ_OP
+                    index_nested_join_table._insert(row_left+row_right)
+
+        print(f'## Select ops no. -> {no_of_ops}')
+        print(f'# Left table size -> {len(self.data)}')
+        print(f'# Right table size -> {len(table_right.data)}')
+
+        return index_nested_join_table
+
+    def _merge_join(self, table_right: Table, condition):
+        '''
+        Join table (left) with a supplied table (right) where condition is met.
+        '''
+        # get columns and operator
+        column_name_left, operator, column_name_right = self._parse_condition(condition, join=True)
+        # try to find both columns, if you fail raise error
+        try:
+            column_index_left = self.column_names.index(column_name_left)
+            column_index_right = table_right.column_names.index(column_name_right)
+        except:
+            raise Exception(f'Columns dont exist in one or both tables.')
+
+        # get the column names of both tables with the table name in front
+        # ex. for left -> name becomes left_table_name_name etc
+        left_names = [f'{self._name}_{colname}' for colname in self.column_names]
+        right_names = [f'{table_right._name}_{colname}' for colname in table_right.column_names]
+
+        # define the new tables name, its column names and types
+        join_table_name = f'{self._name}_join_{table_right._name}'
+        join_table_colnames = left_names+right_names
+        join_table_coltypes = self.column_types+table_right.column_types
+        join_table = Table(name=join_table_name, column_names=join_table_colnames, column_types= join_table_coltypes)
+
+        # count the number of operations (<,> etc)
+        no_of_ops = 0
+        # this code is dumb on purpose... it needs to illustrate the underline technique
+        # for each value in left column and right column, if condition, append the corresponding row to the new table
+
+        left_copy = [row_left[column_index_left] for row_left in self.data]
+        right_copy = [row_right[column_index_right] for row_right in table_right.data]
+        left_dict = dict((row_left[column_index_left], row_left) for row_left in self.data)
+        right_dict = dict((row_right[column_index_right], row_right) for row_right in table_right.data)
+
+        left_copy.sort()
+        right_copy.sort()
+
+        left_index=0
+        right_index=0
+
+        null_row_left = []
+        for k in self.column_types:
+            if k == str:
+                null_row_left.append(None)
+            else:
+                null_row_left.append(-1)
+
+        null_row_right = []
+        for k in table_right.column_types:
+            if k == str:
+                null_row_right.append(None)
+            else:
+                null_row_right.append(-1)
+
+        while left_index < len(left_copy) and right_index < len(right_copy):
+            key = min(left_copy[left_index], right_copy[right_index])
+            left_group = []
+            while left_index < len(left_copy) and key == left_copy[left_index]:
+                left_group.append(left_copy[left_index])
+                left_index += 1
+            right_group = []
+            while right_index < len(right_copy) and key == right_copy[right_index]:
+                right_group.append(right_copy[right_index])
+                right_index += 1
+            # Here you can handle left or right join by replacing an
+            # empty group with a group of one empty row (None,)*len(row)
+            if len(left_group) == 0:
+                if len(right_group) != 0:
+                    for o in right_group:
+                        join_table._insert(null_row_left+right_dict[o])
+                        no_of_ops+=1
+            else:
+                if len(right_group) == 0:
+                    for i in left_group:
+                        join_table._insert(left_dict[i]+null_row_right)
+                        no_of_ops+=1
+
+                else:
+                    for i in left_group:
+                        for o in right_group:
+                            join_table._insert(left_dict[i]+right_dict[o])
+                            no_of_ops+=1
+
+        print(f'## Select ops no. -> {no_of_ops}')
+        print(f'# Left table size -> {len(self.data)}')
+        print(f'# Right table size -> {len(table_right.data)}')
+
+        return join_table
+
+
     def show(self, no_of_rows=None, is_locked=False):
         '''
         Pretty print the table
