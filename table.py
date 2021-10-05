@@ -7,7 +7,7 @@ from misc import get_op, split_condition
 
 """
 
-ISSUES: 
+ISSUES:
 
     Using cprofile, we reached the conclusion that _uddate should be removed. Its very slow. This and constant file i/o is a problem.
 
@@ -15,7 +15,7 @@ ISSUES:
 
     Handling columns should be discussed. Generating column when a function is called is an option. (use property decorator)
 
-    Removing columns all together is another option. 
+    Removing columns all together is another option.
 
     Server should be implemented ASAP. No need to be great, needs to work tho.
 
@@ -355,6 +355,55 @@ class Table:
 
         return join_table
 
+    def _left_outer_join(self, table_right: Table, condition):
+        '''
+        Join table (left) with a supplied table (right) where condition is met.
+        '''
+        # get columns and operator
+        column_name_left, operator, column_name_right = self._parse_condition(condition, join=True)
+
+        column_index_left = self.column_names.index(column_name_left)
+        column_index_right = table_right.column_names.index(column_name_right)
+
+        # get the column names of both tables with the table name in front
+        # ex. for left -> name becomes left_table_name_name etc
+        left_names = [f'{self._name}_{colname}' for colname in self.column_names]
+        right_names = [f'{table_right._name}_{colname}' for colname in table_right.column_names]
+
+        # define the new tables name, its column names and types
+        join_table_name = f'{self._name}_join_{table_right._name}'
+        join_table_colnames = left_names+right_names
+        join_table_coltypes = self.column_types+table_right.column_types
+        join_table = Table(name=join_table_name, column_names=join_table_colnames, column_types= join_table_coltypes)
+
+        # count the number of operations (<,> etc)
+        no_of_ops = 0
+        # this code is dumb on purpose... it needs to illustrate the underline technique
+        # for each value in left column and right column, if condition, append the corresponding row to the new table
+        null_row_right = []
+        for k in table_right.column_types:
+            if k == str:
+                null_row_right.append(None)
+            else:
+                null_row_right.append(-1)
+
+        for row_left in self.data:
+            match = False
+            left_value = row_left[column_index_left]
+            for row_right in table_right.data:
+                right_value = row_right[column_index_right]
+                no_of_ops+=1
+                if get_op(operator, left_value, right_value): #EQ_OP
+                    join_table._insert(row_left+row_right)
+                    match = True
+            if match == False:
+                join_table._insert(row_left+null_row_right)
+
+        print(f'## Select ops no. -> {no_of_ops}')
+        print(f'# Left table size -> {len(self.data)}')
+        print(f'# Right table size -> {len(table_right.data)}')
+
+        return join_table
 
     def show(self, no_of_rows=None, is_locked=False):
         '''
